@@ -9,7 +9,7 @@
     "android",
     "ios"
   ],
-  "main": "index.js",
+  "main": "index.tsx",
   "scripts": {
     "eslint": "eslint *.js",
     "eslint:fix": "yarn eslint --fix",
