@@ -5,16 +5,27 @@ import {
   NativeModules,
   Platform,
 } from 'react-native';
+import { EmitterSubscription } from 'react-native/Libraries/vendor/emitter/EventEmitter';
 
 const { RNBackgroundTimer } = NativeModules;
 const Emitter = new NativeEventEmitter(RNBackgroundTimer);
 
 class BackgroundTimer {
+  uniqueId: number;
+  callbacks: Record<
+    number,
+    { callback: () => void; interval: boolean; timeout: number }
+  >;
+  backgroundTimer?: number;
+  backgroundListener?: EmitterSubscription;
+
   constructor() {
     this.uniqueId = 0;
     this.callbacks = {};
+    this.backgroundTimer = undefined;
+    this.backgroundListener = undefined;
 
-    Emitter.addListener('backgroundTimer.timeout', (id) => {
+    Emitter.addListener('backgroundTimer.timeout', (id: number) => {
       if (this.callbacks[id]) {
         const callbackById = this.callbacks[id];
         const { callback } = callbackById;
@@ -37,22 +48,22 @@ class BackgroundTimer {
     return RNBackgroundTimer.stop();
   }
 
-  runBackgroundTimer(callback, delay) {
+  runBackgroundTimer(callback: () => void, delay: number) {
     const EventEmitter = Platform.select({
       ios: () => NativeAppEventEmitter,
       android: () => DeviceEventEmitter,
-    })();
+    })?.();
     this.start(0);
-    this.backgroundListener = EventEmitter.addListener(
+    this.backgroundListener = EventEmitter?.addListener(
       'backgroundTimer',
       () => {
-        this.backgroundListener.remove();
+        this.backgroundListener?.remove();
         this.backgroundClockMethod(callback, delay);
       },
     );
   }
 
-  backgroundClockMethod(callback, delay) {
+  backgroundClockMethod(callback: () => void, delay: number) {
     this.backgroundTimer = this.setTimeout(() => {
       callback();
       this.backgroundClockMethod(callback, delay);
@@ -61,11 +72,13 @@ class BackgroundTimer {
 
   stopBackgroundTimer() {
     this.stop();
-    this.clearTimeout(this.backgroundTimer);
+    if (this.backgroundTimer) {
+      this.clearTimeout(this.backgroundTimer);
+    }
   }
 
   // New API, allowing for multiple timers
-  setTimeout(callback, timeout) {
+  setTimeout(callback: () => void, timeout: number) {
     this.uniqueId += 1;
     const timeoutId = this.uniqueId;
     this.callbacks[timeoutId] = {
@@ -77,14 +90,13 @@ class BackgroundTimer {
     return timeoutId;
   }
 
-  clearTimeout(timeoutId) {
+  clearTimeout(timeoutId: number) {
     if (this.callbacks[timeoutId]) {
       delete this.callbacks[timeoutId];
-      // RNBackgroundTimer.clearTimeout(timeoutId);
     }
   }
 
-  setInterval(callback, timeout) {
+  setInterval(callback: () => void, timeout: number) {
     this.uniqueId += 1;
     const intervalId = this.uniqueId;
     this.callbacks[intervalId] = {
@@ -96,10 +108,9 @@ class BackgroundTimer {
     return intervalId;
   }
 
-  clearInterval(intervalId) {
+  clearInterval(intervalId: number) {
     if (this.callbacks[intervalId]) {
       delete this.callbacks[intervalId];
-      // RNBackgroundTimer.clearTimeout(intervalId);
     }
   }
 }
